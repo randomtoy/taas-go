@@ -1,0 +1,245 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+      image_tag:
+        description: 'Image tag to deploy (e.g., 1.0.0 or commit SHA)'
+        required: true
+        type: string
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-tarot-${{ github.event.inputs.environment || 'prod' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v3.14.0
+  KUBECTL_VERSION: v1.29.0
+  LOCAL_PORT: 16443
+
+jobs:
+  deploy:
+    name: Deploy to K3s
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine image tag
+        id: image-tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            TAG="${{ github.event.workflow_run.head_branch }}"
+            TAG="${TAG#v}"
+          else
+            TAG="${{ github.event.inputs.image_tag }}"
+            TAG="${TAG#v}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Image tag: $TAG"
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/${{ env.KUBECTL_VERSION }}/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          kubectl version --client
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          SSH_PORT="${{ vars.SSH_PORT }}"
+          SSH_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p ${SSH_PORT} ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Start SSH tunnel
+        id: tunnel
+        run: |
+          SSH_PORT="${{ vars.SSH_PORT }}"
+          SSH_PORT="${SSH_PORT:-22}"
+
+          K8S_API_HOST="${{ vars.K8S_API_HOST }}"
+          K8S_API_HOST="${K8S_API_HOST:-127.0.0.1}"
+
+          K8S_API_PORT="${{ vars.K8S_API_PORT }}"
+          K8S_API_PORT="${K8S_API_PORT:-6443}"
+
+          echo "Starting SSH tunnel: localhost:${{ env.LOCAL_PORT }} -> ${K8S_API_HOST}:${K8S_API_PORT} via ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }}:${SSH_PORT}"
+
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              -o ExitOnForwardFailure=yes \
+              -o LogLevel=ERROR \
+              -i ~/.ssh/deploy_key \
+              -N \
+              -L ${{ env.LOCAL_PORT }}:${K8S_API_HOST}:${K8S_API_PORT} \
+              -p ${SSH_PORT} \
+              ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} &
+
+          SSH_PID=$!
+          echo "ssh_pid=$SSH_PID" >> $GITHUB_OUTPUT
+
+          echo "Waiting for tunnel to be ready..."
+          for i in {1..30}; do
+            if nc -z 127.0.0.1 ${{ env.LOCAL_PORT }} 2>/dev/null; then
+              echo "Tunnel is ready"
+              break
+            fi
+            if ! kill -0 $SSH_PID 2>/dev/null; then
+              echo "SSH process died"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if ! nc -z 127.0.0.1 ${{ env.LOCAL_PORT }} 2>/dev/null; then
+            echo "Tunnel failed to start"
+            exit 1
+          fi
+
+      - name: Setup kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+          # Patch kubeconfig to use local tunnel
+          sed -i -E "s|(server: https?://)[^:]+:[0-9]+|\1127.0.0.1:${{ env.LOCAL_PORT }}|g" ~/.kube/config
+
+          echo "Kubeconfig patched to use tunnel at 127.0.0.1:${{ env.LOCAL_PORT }}"
+
+      - name: Verify cluster connection
+        run: |
+          echo "Testing cluster connectivity..."
+          kubectl cluster-info --request-timeout=15s
+          kubectl get nodes --request-timeout=15s
+
+      - name: Create namespace
+        run: |
+          NAMESPACE="${{ vars.HELM_NAMESPACE }}"
+          NAMESPACE="${NAMESPACE:-tarot}"
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create app secrets
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [[ -z "$OPENROUTER_API_KEY" ]]; then
+            echo "OPENROUTER_API_KEY secret not set, skipping secret creation"
+            exit 0
+          fi
+
+          NAMESPACE="${{ vars.HELM_NAMESPACE }}"
+          NAMESPACE="${NAMESPACE:-tarot}"
+
+          kubectl create secret generic tarot-app-secrets \
+            --namespace "$NAMESPACE" \
+            --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "App secret created/updated"
+
+      - name: Lint Helm chart
+        run: helm lint deploy/helm/tarot-as-a-service
+
+      - name: Prepare Helm values
+        id: values
+        run: |
+          VALUES_FILE=""
+
+          if [[ -n "${{ secrets.HELM_VALUES_B64 }}" ]]; then
+            echo "${{ secrets.HELM_VALUES_B64 }}" | base64 -d > /tmp/custom-values.yaml
+            VALUES_FILE="/tmp/custom-values.yaml"
+            echo "Using custom values file"
+          fi
+
+          echo "values_file=$VALUES_FILE" >> $GITHUB_OUTPUT
+
+      - name: Deploy with Helm
+        run: |
+          RELEASE_NAME="${{ vars.HELM_RELEASE_NAME }}"
+          RELEASE_NAME="${RELEASE_NAME:-tarot-as-a-service}"
+
+          NAMESPACE="${{ vars.HELM_NAMESPACE }}"
+          NAMESPACE="${NAMESPACE:-tarot}"
+
+          HELM_ARGS=(
+            upgrade --install "$RELEASE_NAME"
+            deploy/helm/tarot-as-a-service
+            --namespace "$NAMESPACE"
+            --set "image.tag=${{ steps.image-tag.outputs.tag }}"
+            --wait
+            --timeout 5m
+            --atomic
+          )
+
+          # Add custom values file if exists
+          if [[ -n "${{ steps.values.outputs.values_file }}" ]]; then
+            HELM_ARGS+=(--values "${{ steps.values.outputs.values_file }}")
+          fi
+
+          echo "Deploying: helm ${HELM_ARGS[*]}"
+          helm "${HELM_ARGS[@]}"
+
+      - name: Verify deployment
+        run: |
+          RELEASE_NAME="${{ vars.HELM_RELEASE_NAME }}"
+          RELEASE_NAME="${RELEASE_NAME:-tarot-as-a-service}"
+
+          NAMESPACE="${{ vars.HELM_NAMESPACE }}"
+          NAMESPACE="${NAMESPACE:-tarot}"
+
+          echo "Checking deployment status..."
+          kubectl rollout status deployment/"$RELEASE_NAME" -n "$NAMESPACE" --timeout=5m
+
+          echo ""
+          echo "Deployment info:"
+          kubectl get deployment "$RELEASE_NAME" -n "$NAMESPACE" -o wide
+
+          echo ""
+          echo "Pod status:"
+          kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/name=tarot-as-a-service"
+
+      - name: Cleanup SSH tunnel
+        if: always()
+        run: |
+          if [[ -n "${{ steps.tunnel.outputs.ssh_pid }}" ]]; then
+            kill ${{ steps.tunnel.outputs.ssh_pid }} 2>/dev/null || true
+          fi
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          rm -f ~/.kube/config
