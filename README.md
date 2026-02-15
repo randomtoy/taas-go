@@ -25,7 +25,7 @@ make docker
 | `HTTP_ADDR` | `:8080` | Server listen address |
 | `LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
 | `LLM_PROVIDER` | `openrouter` | LLM provider |
-| `LLM_MODEL` | `cognitivecomputations/dolphin-mistral-24b-venice-edition:free` | Model identifier |
+| `LLM_MODEL` | `qwen/qwen3-4b:free` | Model identifier |
 | `LLM_FALLBACK_MODELS` | *(empty)* | Comma-separated fallback model IDs (tried in order if primary fails) |
 | `OPENROUTER_API_KEY` | *(required)* | OpenRouter API key |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
@@ -88,7 +88,7 @@ curl "http://localhost:8080/v1/tarot?n=5&q=Career+outlook"
     "disclaimer": "For reflection/entertainment; not medical/legal/financial advice."
   },
   "meta": {
-    "model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "model": "qwen/qwen3-4b:free",
     "request_id": "abc123",
     "latency_ms": 1234
   }

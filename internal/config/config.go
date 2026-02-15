@@ -23,7 +23,7 @@ func Load() (Config, error) {
 	c := Config{
 		HTTPAddr:          envOr("HTTP_ADDR", ":8080"),
 		LLMProvider:       envOr("LLM_PROVIDER", "openrouter"),
-		LLMModel:          envOr("LLM_MODEL", "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"),
+		LLMModel:          envOr("LLM_MODEL", "qwen/qwen3-4b:free"),
 		OpenRouterAPIKey:  os.Getenv("OPENROUTER_API_KEY"),
 		OpenRouterBaseURL: envOr("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
 		LLMFallbackModels: parseFallbackModels(os.Getenv("LLM_FALLBACK_MODELS")),
