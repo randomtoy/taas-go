@@ -56,6 +56,17 @@ paths:
           schema:
             type: string
             default: generic
+        - name: lang
+          in: query
+          required: false
+          description: "Language for the interpretation (BCP 47 code). Default: en."
+          schema:
+            type: string
+            default: en
+            examples:
+              - en
+              - ru
+              - es
       responses:
         "200":
           description: Spread generated successfully.

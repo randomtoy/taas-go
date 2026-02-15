@@ -54,11 +54,17 @@ func (h *Handler) ReadTarot(c echo.Context) error {
 		spread = "generic"
 	}
 
+	lang := c.QueryParam("lang")
+	if lang == "" {
+		lang = "en"
+	}
+
 	req := app.ReadSpreadRequest{
 		Question:   q,
 		NumCards:   n,
 		DeckID:     deckID,
 		SpreadType: spread,
+		Lang:       lang,
 	}
 
 	resp, err := h.svc.ReadSpread(c.Request().Context(), req)

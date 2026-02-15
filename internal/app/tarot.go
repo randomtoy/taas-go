@@ -15,6 +15,7 @@ type ReadSpreadRequest struct {
 	NumCards   int
 	DeckID     string
 	SpreadType string
+	Lang       string
 }
 
 // ReadSpreadResponse is the application-level output.
@@ -62,6 +63,7 @@ func (s *TarotService) ReadSpread(ctx context.Context, req ReadSpreadRequest) (R
 		Spread:   string(st),
 		Question: req.Question,
 		Cards:    toCardInputs(spread.Cards),
+		Lang:     req.Lang,
 	}
 
 	start := time.Now()

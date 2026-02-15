@@ -52,6 +52,7 @@ Generate a tarot spread with LLM interpretation.
 | `n` | int | `3` | Number of cards (1-10) |
 | `deck` | string | `major_arcana` | Deck ID |
 | `spread` | string | `generic` | Spread type |
+| `lang` | string | `en` | Interpretation language (BCP 47 code, e.g. `ru`, `es`, `fr`) |
 
 **Examples:**
 

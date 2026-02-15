@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"net/http/httptest"
 	"testing"
 
@@ -23,6 +24,7 @@ func testInput() ports.InterpretInput {
 			{Name: "The Magician", Position: 2, Orientation: "reversed", Keywords: []string{"willpower"}, Short: "Personal power."},
 			{Name: "The Star", Position: 3, Orientation: "upright", Keywords: []string{"hope"}, Short: "Renewed faith."},
 		},
+		Lang: "en",
 	}
 }
 
@@ -209,6 +211,54 @@ func TestClient_Interpret_FallbackModel(t *testing.T) {
 	}
 	if out.Model != "fallback-model" {
 		t.Errorf("expected model=fallback-model, got %s", out.Model)
+	}
+}
+
+func TestClient_Interpret_LangInPrompt(t *testing.T) {
+	llmResp := ports.InterpretOutput{
+		Text:       "Thoughtful interpretation in Russian.",
+		Style:      "neutral",
+		Disclaimer: "For reflection/entertainment; not medical/legal/financial advice.",
+	}
+	llmJSON, _ := json.Marshal(llmResp)
+
+	var gotMessages []map[string]any
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var req map[string]any
+		_ = json.Unmarshal(body, &req)
+		msgs, _ := req["messages"].([]any)
+		for _, m := range msgs {
+			gotMessages = append(gotMessages, m.(map[string]any))
+		}
+
+		resp := map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]any{"content": string(llmJSON)}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	client := openrouter.NewClient(srv.Client(), "key", srv.URL, "model", nil, slog.Default())
+
+	in := testInput()
+	in.Lang = "ru"
+	_, err := client.Interpret(context.Background(), in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify system prompt contains Russian language instruction.
+	if len(gotMessages) == 0 {
+		t.Fatal("no messages captured")
+	}
+	systemContent, _ := gotMessages[0]["content"].(string)
+	if !strings.Contains(systemContent, "Russian") {
+		t.Errorf("system prompt should mention Russian, got: %s", systemContent)
 	}
 }
 

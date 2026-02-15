@@ -75,7 +75,7 @@ func (c *Client) Interpret(ctx context.Context, in ports.InterpretInput) (ports.
 }
 
 func (c *Client) interpretWithModel(ctx context.Context, in ports.InterpretInput, model string) (ports.InterpretOutput, error) {
-	systemPrompt := buildSystemPrompt()
+	systemPrompt := buildSystemPrompt(in.Lang)
 	userPrompt := buildUserPrompt(in)
 
 	content, err := c.callLLM(ctx, model, systemPrompt, userPrompt)
@@ -155,8 +155,36 @@ func (c *Client) callLLM(ctx context.Context, model, system, user string) (strin
 	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
 }
 
-func buildSystemPrompt() string {
-	return `You are a tarot reader providing neutral, reflective interpretations.
+// langNames maps common BCP 47 codes to human-readable language names.
+var langNames = map[string]string{
+	"en": "English",
+	"ru": "Russian",
+	"es": "Spanish",
+	"fr": "French",
+	"de": "German",
+	"it": "Italian",
+	"pt": "Portuguese",
+	"ja": "Japanese",
+	"ko": "Korean",
+	"zh": "Chinese",
+	"ar": "Arabic",
+	"hi": "Hindi",
+	"tr": "Turkish",
+	"uk": "Ukrainian",
+	"pl": "Polish",
+}
+
+func buildSystemPrompt(lang string) string {
+	langInstruction := ""
+	if lang != "" && lang != "en" {
+		name, ok := langNames[lang]
+		if !ok {
+			name = lang
+		}
+		langInstruction = fmt.Sprintf("\n- Respond entirely in %s.", name)
+	}
+
+	return fmt.Sprintf(`You are a tarot reader providing neutral, reflective interpretations.
 
 Rules:
 - Be maximally neutral and balanced.
@@ -164,14 +192,14 @@ Rules:
 - Never predict specific outcomes or disasters.
 - Never command actions or diagnose conditions.
 - Offer balanced possibilities and reflective questions.
-- If a question is provided, incorporate it but never guarantee outcomes.
+- If a question is provided, incorporate it but never guarantee outcomes.%s
 
 Respond with ONLY a JSON object (no markdown, no code fences, no extra text) matching this exact schema:
 {
   "text": "<your interpretation>",
   "style": "neutral",
   "disclaimer": "For reflection/entertainment; not medical/legal/financial advice."
-}`
+}`, langInstruction)
 }
 
 func buildUserPrompt(in ports.InterpretInput) string {

@@ -8,6 +8,7 @@ type InterpretInput struct {
 	Spread   string
 	Question string
 	Cards    []CardInput
+	Lang     string // BCP 47 language code, e.g. "en", "ru", "es"
 }
 
 // CardInput is a simplified card representation for the LLM prompt.
