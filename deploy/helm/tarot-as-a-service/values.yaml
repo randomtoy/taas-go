@@ -1,0 +1,99 @@
+# Default values for tarot-as-a-service
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/randomtoy/taas-go
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+  host: tarot.randomtoy.dev
+  path: /
+  pathType: Prefix
+  tls:
+    enabled: true
+    secretName: tarot-as-a-service-tls
+
+resources:
+  limits:
+    cpu: 250m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Liveness and readiness probes
+probes:
+  liveness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Application environment variables (non-secret)
+env:
+  HTTP_ADDR: ":8080"
+  LOG_LEVEL: "info"
+  LLM_PROVIDER: "openrouter"
+  LLM_MODEL: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+  OPENROUTER_BASE_URL: "https://openrouter.ai/api/v1"
+  LLM_TIMEOUT: "10s"
+
+# Secret containing OPENROUTER_API_KEY
+# Created by deploy workflow or manually:
+#   kubectl create secret generic tarot-app-secrets \
+#     --from-literal=OPENROUTER_API_KEY=sk-or-...
+appSecret:
+  enabled: true
+  name: tarot-app-secrets
+  keys:
+    - OPENROUTER_API_KEY
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

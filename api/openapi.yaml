@@ -1,0 +1,160 @@
+openapi: "3.1.0"
+info:
+  title: Tarot-as-a-Service
+  version: "1.0.0"
+  description: HTTP service that returns a tarot spread with a neutral LLM interpretation.
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      operationId: healthz
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /v1/tarot:
+    get:
+      summary: Generate a tarot spread with LLM interpretation
+      operationId: readTarot
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: User question or context (max 500 chars).
+          schema:
+            type: string
+            maxLength: 500
+        - name: "n"
+          in: query
+          required: false
+          description: Number of cards to draw. Default 3, range 1-10.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 3
+        - name: deck
+          in: query
+          required: false
+          description: Deck identifier. Default major_arcana.
+          schema:
+            type: string
+            default: major_arcana
+        - name: spread
+          in: query
+          required: false
+          description: Spread type. Default generic. If n=3, three_card is used.
+          schema:
+            type: string
+            default: generic
+      responses:
+        "200":
+          description: Spread generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TarotResponse"
+        "400":
+          description: Invalid query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Deck not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Upstream LLM failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    TarotResponse:
+      type: object
+      required: [spread, deck, cards, interpretation, meta]
+      properties:
+        spread:
+          type: string
+          example: three_card
+        deck:
+          type: string
+          example: major_arcana
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/Card"
+        interpretation:
+          $ref: "#/components/schemas/Interpretation"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    Card:
+      type: object
+      required: [id, name, position, orientation, keywords, short]
+      properties:
+        id:
+          type: string
+          example: the_fool
+        name:
+          type: string
+          example: The Fool
+        position:
+          type: integer
+          example: 1
+        orientation:
+          type: string
+          enum: [upright, reversed]
+        keywords:
+          type: array
+          items:
+            type: string
+        short:
+          type: string
+
+    Interpretation:
+      type: object
+      required: [style, text, disclaimer]
+      properties:
+        style:
+          type: string
+          example: neutral
+        text:
+          type: string
+        disclaimer:
+          type: string
+          example: "For reflection/entertainment; not medical/legal/financial advice."
+
+    Meta:
+      type: object
+      required: [model, request_id, latency_ms]
+      properties:
+        model:
+          type: string
+          example: cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+        request_id:
+          type: string
+        latency_ms:
+          type: integer
+          format: int64
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

@@ -1,0 +1,134 @@
+[
+  {
+    "id": "the_fool",
+    "name": "The Fool",
+    "keywords": ["beginnings", "spontaneity", "trust", "innocence"],
+    "short": "A fresh start and openness to experience."
+  },
+  {
+    "id": "the_magician",
+    "name": "The Magician",
+    "keywords": ["willpower", "resourcefulness", "skill", "manifestation"],
+    "short": "Harnessing personal power to create change."
+  },
+  {
+    "id": "the_high_priestess",
+    "name": "The High Priestess",
+    "keywords": ["intuition", "mystery", "inner knowledge", "patience"],
+    "short": "Trusting inner wisdom and the unseen."
+  },
+  {
+    "id": "the_empress",
+    "name": "The Empress",
+    "keywords": ["abundance", "nurturing", "creativity", "nature"],
+    "short": "Growth, fertility, and creative expression."
+  },
+  {
+    "id": "the_emperor",
+    "name": "The Emperor",
+    "keywords": ["authority", "structure", "stability", "leadership"],
+    "short": "Order, discipline, and taking charge."
+  },
+  {
+    "id": "the_hierophant",
+    "name": "The Hierophant",
+    "keywords": ["tradition", "guidance", "conformity", "education"],
+    "short": "Established wisdom and spiritual guidance."
+  },
+  {
+    "id": "the_lovers",
+    "name": "The Lovers",
+    "keywords": ["partnership", "choice", "harmony", "values"],
+    "short": "Meaningful connections and important choices."
+  },
+  {
+    "id": "the_chariot",
+    "name": "The Chariot",
+    "keywords": ["determination", "willpower", "victory", "focus"],
+    "short": "Moving forward with confidence and control."
+  },
+  {
+    "id": "strength",
+    "name": "Strength",
+    "keywords": ["courage", "patience", "compassion", "inner strength"],
+    "short": "Quiet inner power and gentle perseverance."
+  },
+  {
+    "id": "the_hermit",
+    "name": "The Hermit",
+    "keywords": ["introspection", "solitude", "guidance", "wisdom"],
+    "short": "Seeking answers through inner contemplation."
+  },
+  {
+    "id": "wheel_of_fortune",
+    "name": "Wheel of Fortune",
+    "keywords": ["cycles", "change", "fate", "turning point"],
+    "short": "The natural ebb and flow of circumstances."
+  },
+  {
+    "id": "justice",
+    "name": "Justice",
+    "keywords": ["fairness", "truth", "balance", "accountability"],
+    "short": "Weighing decisions with clarity and honesty."
+  },
+  {
+    "id": "the_hanged_man",
+    "name": "The Hanged Man",
+    "keywords": ["surrender", "perspective", "pause", "release"],
+    "short": "Seeing things from a new angle through letting go."
+  },
+  {
+    "id": "death",
+    "name": "Death",
+    "keywords": ["transformation", "ending", "renewal", "transition"],
+    "short": "Closing one chapter to begin another."
+  },
+  {
+    "id": "temperance",
+    "name": "Temperance",
+    "keywords": ["balance", "moderation", "patience", "harmony"],
+    "short": "Finding equilibrium through patience and blending."
+  },
+  {
+    "id": "the_devil",
+    "name": "The Devil",
+    "keywords": ["attachment", "shadow", "materialism", "restriction"],
+    "short": "Examining what binds and what can be released."
+  },
+  {
+    "id": "the_tower",
+    "name": "The Tower",
+    "keywords": ["upheaval", "revelation", "sudden change", "breakthrough"],
+    "short": "Unexpected disruption that clears the way for truth."
+  },
+  {
+    "id": "the_star",
+    "name": "The Star",
+    "keywords": ["hope", "inspiration", "serenity", "renewal"],
+    "short": "Calm after the storm and renewed faith."
+  },
+  {
+    "id": "the_moon",
+    "name": "The Moon",
+    "keywords": ["illusion", "intuition", "uncertainty", "subconscious"],
+    "short": "Navigating uncertainty with intuition."
+  },
+  {
+    "id": "the_sun",
+    "name": "The Sun",
+    "keywords": ["joy", "vitality", "clarity", "success"],
+    "short": "Warmth, optimism, and clear understanding."
+  },
+  {
+    "id": "judgement",
+    "name": "Judgement",
+    "keywords": ["reflection", "reckoning", "calling", "rebirth"],
+    "short": "A moment of honest self-evaluation and renewal."
+  },
+  {
+    "id": "the_world",
+    "name": "The World",
+    "keywords": ["completion", "integration", "fulfillment", "wholeness"],
+    "short": "A sense of wholeness and accomplishment."
+  }
+]
