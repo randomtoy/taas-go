@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -100,14 +101,18 @@ func toResponse(r app.ReadSpreadResponse, requestID string) TarotResponse {
 }
 
 func mapError(c echo.Context, err error) error {
+	requestID, _ := c.Get("request_id").(string)
+
 	switch {
 	case errors.Is(err, domain.ErrDeckNotFound):
 		return c.JSON(http.StatusNotFound, ErrorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrInvalidN), errors.Is(err, domain.ErrNExceedsDeck):
 		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrUpstreamLLM), errors.Is(err, domain.ErrInvalidLLMJSON):
+		slog.Error("upstream LLM failure", "request_id", requestID, "error", err)
 		return c.JSON(http.StatusBadGateway, ErrorResponse{Error: "upstream LLM failure"})
 	default:
+		slog.Error("internal error", "request_id", requestID, "error", err)
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "internal error"})
 	}
 }
