@@ -40,6 +40,7 @@ func main() {
 		cfg.OpenRouterAPIKey,
 		cfg.OpenRouterBaseURL,
 		cfg.LLMModel,
+		cfg.LLMFallbackModels,
 		logger,
 	)
 

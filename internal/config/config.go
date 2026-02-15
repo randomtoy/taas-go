@@ -9,13 +9,14 @@ import (
 )
 
 type Config struct {
-	HTTPAddr          string
-	LogLevel          slog.Level
-	LLMProvider       string
-	LLMModel          string
-	OpenRouterAPIKey  string
-	OpenRouterBaseURL string
-	LLMTimeout        time.Duration
+	HTTPAddr           string
+	LogLevel           slog.Level
+	LLMProvider        string
+	LLMModel           string
+	LLMFallbackModels  []string
+	OpenRouterAPIKey   string
+	OpenRouterBaseURL  string
+	LLMTimeout         time.Duration
 }
 
 func Load() (Config, error) {
@@ -25,6 +26,7 @@ func Load() (Config, error) {
 		LLMModel:          envOr("LLM_MODEL", "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"),
 		OpenRouterAPIKey:  os.Getenv("OPENROUTER_API_KEY"),
 		OpenRouterBaseURL: envOr("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+		LLMFallbackModels: parseFallbackModels(os.Getenv("LLM_FALLBACK_MODELS")),
 		LLMTimeout:        10 * time.Second,
 	}
 
@@ -54,6 +56,20 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func parseFallbackModels(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var models []string
+	for _, m := range strings.Split(s, ",") {
+		m = strings.TrimSpace(m)
+		if m != "" {
+			models = append(models, m)
+		}
+	}
+	return models
 }
 
 func parseLogLevel(s string) (slog.Level, error) {

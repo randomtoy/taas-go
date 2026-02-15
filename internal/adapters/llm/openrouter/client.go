@@ -16,24 +16,24 @@ import (
 
 // Client implements ports.Interpreter via the OpenRouter API.
 type Client struct {
-	httpClient *http.Client
-	apiKey     string
-	baseURL    string
-	model      string
-	logger     *slog.Logger
+	httpClient     *http.Client
+	apiKey         string
+	baseURL        string
+	model          string
+	fallbackModels []string
+	logger         *slog.Logger
 }
 
-func NewClient(httpClient *http.Client, apiKey, baseURL, model string, logger *slog.Logger) *Client {
+func NewClient(httpClient *http.Client, apiKey, baseURL, model string, fallbackModels []string, logger *slog.Logger) *Client {
 	return &Client{
-		httpClient: httpClient,
-		apiKey:     apiKey,
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		model:      model,
-		logger:     logger,
+		httpClient:     httpClient,
+		apiKey:         apiKey,
+		baseURL:        strings.TrimRight(baseURL, "/"),
+		model:          model,
+		fallbackModels: fallbackModels,
+		logger:         logger,
 	}
 }
-
-func (c *Client) Model() string { return c.model }
 
 // chatRequest / chatResponse mirror the OpenAI-compatible API shapes.
 type chatMessage struct {
@@ -55,18 +55,38 @@ type chatResponse struct {
 }
 
 func (c *Client) Interpret(ctx context.Context, in ports.InterpretInput) (ports.InterpretOutput, error) {
+	models := make([]string, 0, 1+len(c.fallbackModels))
+	models = append(models, c.model)
+	models = append(models, c.fallbackModels...)
+
+	var lastErr error
+	for _, model := range models {
+		out, err := c.interpretWithModel(ctx, in, model)
+		if err == nil {
+			return out, nil
+		}
+		lastErr = err
+		if len(models) > 1 {
+			c.logger.WarnContext(ctx, "model failed, trying next", "model", model, "error", err)
+		}
+	}
+
+	return ports.InterpretOutput{}, lastErr
+}
+
+func (c *Client) interpretWithModel(ctx context.Context, in ports.InterpretInput, model string) (ports.InterpretOutput, error) {
 	systemPrompt := buildSystemPrompt()
 	userPrompt := buildUserPrompt(in)
 
-	content, err := c.callLLM(ctx, systemPrompt, userPrompt)
+	content, err := c.callLLM(ctx, model, systemPrompt, userPrompt)
 	if err != nil {
 		return ports.InterpretOutput{}, fmt.Errorf("%w: %w", domain.ErrUpstreamLLM, err)
 	}
 
 	var out ports.InterpretOutput
 	if err := json.Unmarshal([]byte(content), &out); err != nil {
-		c.logger.WarnContext(ctx, "LLM returned invalid JSON, retrying", "error", err)
-		content, err = c.callLLM(ctx, systemPrompt, retryPrompt(content))
+		c.logger.WarnContext(ctx, "LLM returned invalid JSON, retrying", "model", model, "error", err)
+		content, err = c.callLLM(ctx, model, systemPrompt, retryPrompt(content))
 		if err != nil {
 			return ports.InterpretOutput{}, fmt.Errorf("%w: %w", domain.ErrUpstreamLLM, err)
 		}
@@ -81,13 +101,14 @@ func (c *Client) Interpret(ctx context.Context, in ports.InterpretInput) (ports.
 	if out.Disclaimer == "" {
 		out.Disclaimer = "For reflection/entertainment; not medical/legal/financial advice."
 	}
+	out.Model = model
 
 	return out, nil
 }
 
-func (c *Client) callLLM(ctx context.Context, system, user string) (string, error) {
+func (c *Client) callLLM(ctx context.Context, model, system, user string) (string, error) {
 	reqBody := chatRequest{
-		Model: c.model,
+		Model: model,
 		Messages: []chatMessage{
 			{Role: "system", Content: system},
 			{Role: "user", Content: user},

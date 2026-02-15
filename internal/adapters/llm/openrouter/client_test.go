@@ -70,6 +70,7 @@ func TestClient_Interpret_Success(t *testing.T) {
 		"test-key",
 		srv.URL,
 		"test-model",
+		nil,
 		slog.Default(),
 	)
 
@@ -119,7 +120,7 @@ func TestClient_Interpret_BadJSON_Retry_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := openrouter.NewClient(srv.Client(), "key", srv.URL, "model", slog.Default())
+	client := openrouter.NewClient(srv.Client(), "key", srv.URL, "model", nil, slog.Default())
 
 	out, err := client.Interpret(context.Background(), testInput())
 	if err != nil {
@@ -145,11 +146,69 @@ func TestClient_Interpret_BadJSON_Retry_Failure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := openrouter.NewClient(srv.Client(), "key", srv.URL, "model", slog.Default())
+	client := openrouter.NewClient(srv.Client(), "key", srv.URL, "model", nil, slog.Default())
 
 	_, err := client.Interpret(context.Background(), testInput())
 	if err == nil {
 		t.Fatal("expected error for double-bad JSON, got nil")
+	}
+}
+
+func TestClient_Interpret_FallbackModel(t *testing.T) {
+	llmResp := ports.InterpretOutput{
+		Text:       "Fallback interpretation.",
+		Style:      "neutral",
+		Disclaimer: "For reflection/entertainment; not medical/legal/financial advice.",
+	}
+	llmJSON, _ := json.Marshal(llmResp)
+
+	var modelsRequested []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var req map[string]any
+		_ = json.Unmarshal(body, &req)
+		model := req["model"].(string)
+		modelsRequested = append(modelsRequested, model)
+
+		if model == "primary-model" {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":"rate limited"}`))
+			return
+		}
+
+		resp := map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]any{"content": string(llmJSON)}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	client := openrouter.NewClient(
+		srv.Client(), "key", srv.URL, "primary-model",
+		[]string{"fallback-model"}, slog.Default(),
+	)
+
+	out, err := client.Interpret(context.Background(), testInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(modelsRequested) != 2 {
+		t.Errorf("expected 2 model attempts, got %d: %v", len(modelsRequested), modelsRequested)
+	}
+	if modelsRequested[0] != "primary-model" {
+		t.Errorf("first attempt should be primary-model, got %s", modelsRequested[0])
+	}
+	if modelsRequested[1] != "fallback-model" {
+		t.Errorf("second attempt should be fallback-model, got %s", modelsRequested[1])
+	}
+	if out.Text != "Fallback interpretation." {
+		t.Errorf("unexpected text: %s", out.Text)
+	}
+	if out.Model != "fallback-model" {
+		t.Errorf("expected model=fallback-model, got %s", out.Model)
 	}
 }
 
@@ -160,7 +219,7 @@ func TestClient_Interpret_UpstreamError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := openrouter.NewClient(srv.Client(), "key", srv.URL, "model", slog.Default())
+	client := openrouter.NewClient(srv.Client(), "key", srv.URL, "model", nil, slog.Default())
 
 	_, err := client.Interpret(context.Background(), testInput())
 	if err == nil {

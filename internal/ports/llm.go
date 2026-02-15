@@ -24,6 +24,7 @@ type InterpretOutput struct {
 	Text       string `json:"text"`
 	Style      string `json:"style"`
 	Disclaimer string `json:"disclaimer"`
+	Model      string `json:"-"` // set by adapter, not from LLM JSON
 }
 
 // Interpreter generates a tarot interpretation via an LLM.

@@ -77,7 +77,7 @@ func (s *TarotService) ReadSpread(ctx context.Context, req ReadSpreadRequest) (R
 		DeckID:         req.DeckID,
 		Cards:          spread.Cards,
 		Interpretation: interpretation,
-		Model:          s.model,
+		Model:          interpretationModel(interpretation.Model, s.model),
 		LatencyMS:      latency,
 	}, nil
 }
@@ -94,6 +94,13 @@ func resolveSpreadType(raw string, n int) domain.SpreadType {
 	default:
 		return domain.SpreadType(raw)
 	}
+}
+
+func interpretationModel(fromLLM, fallback string) string {
+	if fromLLM != "" {
+		return fromLLM
+	}
+	return fallback
 }
 
 func toCardInputs(cards []domain.DrawnCard) []ports.CardInput {

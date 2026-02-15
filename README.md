@@ -26,6 +26,7 @@ make docker
 | `LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
 | `LLM_PROVIDER` | `openrouter` | LLM provider |
 | `LLM_MODEL` | `cognitivecomputations/dolphin-mistral-24b-venice-edition:free` | Model identifier |
+| `LLM_FALLBACK_MODELS` | *(empty)* | Comma-separated fallback model IDs (tried in order if primary fails) |
 | `OPENROUTER_API_KEY` | *(required)* | OpenRouter API key |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
 | `LLM_TIMEOUT` | `10s` | Timeout for LLM requests |
