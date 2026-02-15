@@ -3,7 +3,7 @@
 CLAUDE.md
 
 # Binaries
-tarotd
+/tarotd
 *.exe
 *.exe~
 *.dll
